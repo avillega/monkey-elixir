@@ -143,7 +143,12 @@ defmodule ParserTest do
       {"true", "true"},
       {"false", "false"},
       {"3 < 4 == true", "((3 < 4) == true)"},
-      {"3 > 4 == false", "((3 > 4) == false)"}
+      {"3 > 4 == false", "((3 > 4) == false)"},
+      {"1 + (2 + 3) + 4", "((1 + (2 + 3)) + 4)"},
+      {"(5 + 5) * 2", "((5 + 5) * 2)"},
+      {"2 / (5 + 5)", "(2 / (5 + 5))"},
+      {"-(5 + 5)", "(-(5 + 5))"},
+      {"!(true == true)", "(!(true == true))"}
     ]
 
     Enum.each(tests, fn {input, expected} ->
