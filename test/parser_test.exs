@@ -2,6 +2,7 @@ defmodule ParserTest do
   use ExUnit.Case
   doctest Parser
   alias AST.InfixExpression
+  alias AST.BoolLiteral
   alias AST.Identifier
   alias AST.{LetStmt, IntLiteral}
 
@@ -73,12 +74,16 @@ defmodule ParserTest do
   test "parse prefix expressions" do
     input = [
       "!5;",
-      "-15;"
+      "-15;",
+      "!true",
+      "!false"
     ]
 
     expected = [
       {"!", 5},
-      {"-", 15}
+      {"-", 15},
+      {"!", true},
+      {"!", false}
     ]
 
     Enum.zip(input, expected)
@@ -94,7 +99,7 @@ defmodule ParserTest do
         assert stmt.type === :expression_stmt
         assert stmt.expression.type === :prefix_expression
         assert stmt.expression.operator === op
-        test_int_literal(stmt.expression.right, expected_right)
+        test_literal_expression(stmt.expression.right, expected_right)
     end)
   end
 
@@ -107,7 +112,10 @@ defmodule ParserTest do
       "3 < 6;",
       "6 > 3;",
       "100 == 100;",
-      "42 != 43;"
+      "42 != 43;",
+      "true == true",
+      "false != true",
+      "false == false"
     ]
 
     expected = [
@@ -118,7 +126,10 @@ defmodule ParserTest do
       {3, "<", 6},
       {6, ">", 3},
       {100, "==", 100},
-      {42, "!=", 43}
+      {42, "!=", 43},
+      {true, "==", true},
+      {false, "!=", true},
+      {false, "==", false}
     ]
 
     Enum.zip(input, expected)
@@ -151,7 +162,11 @@ defmodule ParserTest do
       "5 > 4 == 3 < 4",
       "5 < 4 != 3 > 4",
       "3 + 4 * 5 == 3 * 1 + 4 * 5",
-      "3+4*5 == 3*1+4*5"
+      "3+4*5 == 3*1+4*5",
+      "true",
+      "false",
+      "3 < 4 == true",
+      "3 > 4 == false"
     ]
 
     expected = [
@@ -168,7 +183,11 @@ defmodule ParserTest do
       "((5 > 4) == (3 < 4))",
       "((5 < 4) != (3 > 4))",
       "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
-      "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))"
+      "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
+      "true",
+      "false",
+      "((3 < 4) == true)",
+      "((3 > 4) == false)"
     ]
 
     Enum.zip(input, expected)
@@ -178,6 +197,19 @@ defmodule ParserTest do
       assert program.errors === []
       assert "#{program}" == expected
     end)
+  end
+
+  test "parse boolean literal" do
+    input = "true; false;"
+    expected = [true, false]
+
+    tokens = Lexer.tokenize(input)
+    program = Parser.parse_program(tokens)
+    assert program.errors === []
+    assert Enum.count(program.statements) === Enum.count(expected)
+
+    Enum.zip(program.statements, expected)
+    |> Enum.each(fn {stmt, expected} -> test_bool_literal(stmt.expression, expected) end)
   end
 
   defp test_let_stmt(stmt = %LetStmt{}, identifier_name) do
@@ -195,10 +227,16 @@ defmodule ParserTest do
     assert ident.value === value
   end
 
+  defp test_bool_literal(literal = %BoolLiteral{}, expected_val) do
+    assert literal.type === :bool_literal
+    assert literal.value === expected_val
+  end
+
   defp test_literal_expression(expr, expected) do
     case expr do
       %IntLiteral{} -> test_int_literal(expr, expected)
       %Identifier{} -> test_identifier(expr, expected)
+      %BoolLiteral{} -> test_bool_literal(expr, expected)
     end
   end
 

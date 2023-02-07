@@ -7,7 +7,8 @@ defmodule Parser do
     ReturnStmt,
     IntLiteral,
     PrefixExpression,
-    InfixExpression
+    InfixExpression,
+    BoolLiteral
   }
 
   def parse_program(tokens) do
@@ -162,6 +163,8 @@ defmodule Parser do
       :int -> &parse_int_literal/1
       :bang -> &parse_prefix_expression/1
       :minus -> &parse_prefix_expression/1
+      true -> &parse_bool_literal/1
+      false -> &parse_bool_literal/1
       _ -> nil
     end
   end
@@ -201,5 +204,9 @@ defmodule Parser do
     with {:ok, rest, right} <- parse_expression(rest, operator_precedence(token.type)) do
       {:ok, rest, %InfixExpression{left: left, operator: token.lexeme, right: right}}
     end
+  end
+
+  defp parse_bool_literal([token | rest]) do
+    {:ok, rest, %BoolLiteral{value: token.type}}
   end
 end

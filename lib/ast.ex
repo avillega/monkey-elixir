@@ -35,7 +35,7 @@ defmodule AST do
     defstruct [:expression, type: :expression_stmt]
 
     defimpl String.Chars, for: __MODULE__ do
-      def to_string(stmt) do 
+      def to_string(stmt) do
         if stmt.expression, do: "#{stmt.expression}", else: ""
       end
     end
@@ -65,7 +65,7 @@ defmodule AST do
 
   defmodule PrefixExpression do
     @enforce_keys [:operator, :right]
-    # :value is an integer
+    # :operator is string, :right is a expression 
     defstruct [:operator, :right, type: :prefix_expression]
 
     defimpl String.Chars, for: __MODULE__ do
@@ -75,11 +75,21 @@ defmodule AST do
 
   defmodule InfixExpression do
     @enforce_keys [:left, :operator, :right]
-    # :value is an integer
+    # :left is an expression, :operator is a string, :right is a expression
     defstruct [:left, :operator, :right, type: :infix_expression]
 
     defimpl String.Chars, for: __MODULE__ do
       def to_string(expr), do: "(#{expr.left} #{expr.operator} #{expr.right})"
+    end
+  end
+
+  defmodule BoolLiteral do
+    @enforce_keys [:value]
+    # :value is boolean
+    defstruct [:value, type: :bool_literal]
+
+    defimpl String.Chars, for: __MODULE__ do
+      def to_string(expr), do: "#{expr.value}"
     end
   end
 end
