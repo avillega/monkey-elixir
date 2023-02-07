@@ -72,22 +72,14 @@ defmodule ParserTest do
   end
 
   test "parse prefix expressions" do
-    input = [
-      "!5;",
-      "-15;",
-      "!true",
-      "!false"
+    tests = [
+      {"!5;", {"!", 5}},
+      {"-15;", {"-", 15}},
+      {"!true", {"!", true}},
+      {"!false", {"!", false}}
     ]
 
-    expected = [
-      {"!", 5},
-      {"-", 15},
-      {"!", true},
-      {"!", false}
-    ]
-
-    Enum.zip(input, expected)
-    |> Enum.each(fn
+    Enum.each(tests, fn
       {input, {op, expected_right}} ->
         tokens = Lexer.tokenize(input)
         program = Parser.parse_program(tokens)
@@ -104,36 +96,21 @@ defmodule ParserTest do
   end
 
   test "parse infix expressions" do
-    input = [
-      "5 + 4;",
-      "15 - 10;",
-      "9 * 10;",
-      "7 / 45;",
-      "3 < 6;",
-      "6 > 3;",
-      "100 == 100;",
-      "42 != 43;",
-      "true == true",
-      "false != true",
-      "false == false"
+    tests = [
+      {"5 + 4;", {5, "+", 4}},
+      {"15 - 10;", {15, "-", 10}},
+      {"9 * 10;", {9, "*", 10}},
+      {"7 / 45;", {7, "/", 45}},
+      {"3 < 6;", {3, "<", 6}},
+      {"6 > 3;", {6, ">", 3}},
+      {"100 == 100;", {100, "==", 100}},
+      {"42 != 43;", {42, "!=", 43}},
+      {"true == true", {true, "==", true}},
+      {"false != true", {false, "!=", true}},
+      {"false == false", {false, "==", false}}
     ]
 
-    expected = [
-      {5, "+", 4},
-      {15, "-", 10},
-      {9, "*", 10},
-      {7, "/", 45},
-      {3, "<", 6},
-      {6, ">", 3},
-      {100, "==", 100},
-      {42, "!=", 43},
-      {true, "==", true},
-      {false, "!=", true},
-      {false, "==", false}
-    ]
-
-    Enum.zip(input, expected)
-    |> Enum.each(fn
+    Enum.each(tests, fn
       {input, {expected_left, op, expected_right}} ->
         tokens = Lexer.tokenize(input)
         program = Parser.parse_program(tokens)
@@ -148,50 +125,28 @@ defmodule ParserTest do
   end
 
   test "operator precedence parsing" do
-    input = [
-      "-a * b",
-      "!-a",
-      "a + b + c",
-      "a + b * c",
-      "a + b - c",
-      "a * b * c",
-      "a * b / c",
-      "a + b / c",
-      "a + b * c - d / e - f",
-      "3 + 4; -5 + 5",
-      "5 > 4 == 3 < 4",
-      "5 < 4 != 3 > 4",
-      "3 + 4 * 5 == 3 * 1 + 4 * 5",
-      "3+4*5 == 3*1+4*5",
-      "true",
-      "false",
-      "3 < 4 == true",
-      "3 > 4 == false"
+    tests = [
+      {"-a * b", "((-a) * b)"},
+      {"!-a", "(!(-a))"},
+      {"a + b + c", "((a + b) + c)"},
+      {"a + b * c", "(a + (b * c))"},
+      {"a + b - c", "((a + b) - c)"},
+      {"a * b * c", "((a * b) * c)"},
+      {"a * b / c", "((a * b) / c)"},
+      {"a + b / c", "(a + (b / c))"},
+      {"a + b * c - d / e - f", "(((a + (b * c)) - (d / e)) - f)"},
+      {"3 + 4; -5 + 5", "(3 + 4)((-5) + 5)"},
+      {"5 > 4 == 3 < 4", "((5 > 4) == (3 < 4))"},
+      {"5 < 4 != 3 > 4", "((5 < 4) != (3 > 4))"},
+      {"3 + 4 * 5 == 3 * 1 + 4 * 5", "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))"},
+      {"3+4*5 == 3*1+4*5", "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))"},
+      {"true", "true"},
+      {"false", "false"},
+      {"3 < 4 == true", "((3 < 4) == true)"},
+      {"3 > 4 == false", "((3 > 4) == false)"}
     ]
 
-    expected = [
-      "((-a) * b)",
-      "(!(-a))",
-      "((a + b) + c)",
-      "(a + (b * c))",
-      "((a + b) - c)",
-      "((a * b) * c)",
-      "((a * b) / c)",
-      "(a + (b / c))",
-      "(((a + (b * c)) - (d / e)) - f)",
-      "(3 + 4)((-5) + 5)",
-      "((5 > 4) == (3 < 4))",
-      "((5 < 4) != (3 > 4))",
-      "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
-      "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
-      "true",
-      "false",
-      "((3 < 4) == true)",
-      "((3 > 4) == false)"
-    ]
-
-    Enum.zip(input, expected)
-    |> Enum.each(fn {input, expected} ->
+    Enum.each(tests, fn {input, expected} ->
       tokens = Lexer.tokenize(input)
       program = Parser.parse_program(tokens)
       assert program.errors === []
