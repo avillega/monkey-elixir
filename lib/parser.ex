@@ -1,4 +1,7 @@
 defmodule Parser do
+  alias AST.BlockStmt
+  alias AST.IfExpression
+
   alias AST.{
     Program,
     LetStmt,
@@ -12,18 +15,32 @@ defmodule Parser do
   }
 
   def parse_program(tokens) do
-    {_, stmts, errors} = do_parse_program(tokens, [], [])
+    {_, _, stmts, errors} = do_parse_stmts(tokens, [], [], fn _ -> false end)
     %Program{statements: Enum.reverse(stmts), errors: errors}
   end
 
-  defp do_parse_program([], stmts, errors), do: {:ok, stmts, errors}
+  defp do_parse_stmts([], stmts, errors, _), do: {:ok, [], stmts, errors}
 
-  defp do_parse_program(tokens, stmts, errors) do
-    case next_statement(tokens) do
-      {:ok, rest, nil} -> do_parse_program(rest, stmts, errors)
-      {:ok, rest, stmt} -> do_parse_program(rest, [stmt | stmts], errors)
-      {:end, _, _} -> {:ok, stmts, errors}
-      {:error, rest, reason} -> do_parse_program(rest, stmts, [reason | errors])
+  defp do_parse_stmts(tokens, stmts, errors, end_fn) do
+    if end_fn.(tokens) do
+      {:ok, tokens, stmts, errors}
+    else
+      case next_statement(tokens) do
+        {:ok, rest, nil} ->
+          do_parse_stmts(rest, stmts, errors, end_fn)
+
+        {:ok, rest, stmt} ->
+          do_parse_stmts(rest, [stmt | stmts], errors, end_fn)
+
+        {:end, _, _} ->
+          {:ok, [], stmts, errors}
+
+        {:error, rest, reasons} when is_list(reasons) ->
+          do_parse_stmts(rest, stmts, reasons ++ errors, end_fn)
+
+        {:error, rest, reason} ->
+          do_parse_stmts(rest, stmts, [reason | errors], end_fn)
+      end
     end
   end
 
@@ -92,6 +109,20 @@ defmodule Parser do
     case code do
       :ok -> {:ok, rest, %ExpressionStmt{expression: payload}}
       :error -> {:error, rest, payload}
+    end
+  end
+
+  defp parse_block_stmt(tokens) do
+    {:ok, rest, stmts, errors} =
+      do_parse_stmts(tokens, [], [], fn [token | _tokens] ->
+        token.type === :rbrace || token.type === :eof
+      end)
+
+    with {:ok, rest, _} <- expect_token(rest, :rbrace) do
+      case errors do
+        [] -> {:ok, rest, %BlockStmt{statements: stmts}}
+        _ -> {:error, rest, errors}
+      end
     end
   end
 
@@ -165,6 +196,8 @@ defmodule Parser do
       :minus -> &parse_prefix_expression/1
       true -> &parse_bool_literal/1
       false -> &parse_bool_literal/1
+      :lparen -> &parse_group_expression/1
+      :if -> &parse_if_expression/1
       _ -> nil
     end
   end
@@ -209,4 +242,37 @@ defmodule Parser do
   defp parse_bool_literal([token | rest]) do
     {:ok, rest, %BoolLiteral{value: token.type}}
   end
+
+  defp parse_group_expression([_ | rest]) do
+    with {:ok, rest, expr} <- parse_expression(rest, :lowest) do
+      case rest do
+        [%Token{type: :rparen} | rest] -> {:ok, rest, expr}
+        _ -> {:error, rest, "unmatched '(' in group expression"}
+      end
+    end
+  end
+
+  defp parse_if_expression([_ | rest]) do
+    with {:ok, rest, _} <- expect_token(rest, :lparen),
+         {:ok, rest, condition} <- parse_expression(rest, :lowest),
+         {:ok, rest, _} <- expect_token(rest, :rparen),
+         {:ok, rest, _} <- expect_token(rest, :lbrace),
+         {:ok, rest, then} <- parse_block_stmt(rest) do
+      case rest do
+        [%Token{type: :else} | rest] ->
+          with {:ok, rest, _} <- expect_token(rest, :lbrace),
+               {:ok, rest, else_branch} <- parse_block_stmt(rest) do
+            {:ok, rest, %IfExpression{condition: condition, then: then, else: else_branch}}
+          end
+
+        _ ->
+          {:ok, rest, %IfExpression{condition: condition, then: then}}
+      end
+    end
+  end
+
+  defp expect_token([%Token{type: expected_type} | rest], expected_type), do: {:ok, rest, nil}
+
+  defp expect_token([%Token{lexeme: lexeme} | rest], expected),
+    do: {:error, rest, "Unexpected token, got #{lexeme}, expected #{expected}"}
 end

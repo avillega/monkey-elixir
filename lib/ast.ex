@@ -41,6 +41,16 @@ defmodule AST do
     end
   end
 
+  defmodule BlockStmt do
+    @enforce_keys [:statements]
+    # :expression is an Expression
+    defstruct [:statements, type: :block_stmt]
+
+    defimpl String.Chars, for: __MODULE__ do
+      def to_string(stmt), do: "{ #{Enum.join(stmt.statements)} }"
+    end
+  end
+
   # Expressions
 
   defmodule Identifier do
@@ -90,6 +100,19 @@ defmodule AST do
 
     defimpl String.Chars, for: __MODULE__ do
       def to_string(expr), do: "#{expr.value}"
+    end
+  end
+
+  defmodule IfExpression do
+    @enforce_keys [:condition, :then]
+    # :condition is an expression, :then is a block stmt, :else is an optional block stmt
+    defstruct [:condition, :then, :else, type: :if_expression]
+
+    defimpl String.Chars, for: __MODULE__ do
+      def to_string(expr) do
+        else_str = if expr.else, do: "else #{expr.else}", else: ""
+        "if#{expr.condition} #{expr.then}#{else_str}"
+      end
     end
   end
 end

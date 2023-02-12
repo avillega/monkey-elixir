@@ -172,6 +172,44 @@ defmodule ParserTest do
     |> Enum.each(fn {stmt, expected} -> test_bool_literal(stmt.expression, expected) end)
   end
 
+  test "parse if expressions" do
+    input = "if (x < y) { x }"
+
+    program = input |> Lexer.tokenize() |> Parser.parse_program()
+    assert program.errors === []
+
+    [stmt] = program.statements
+    assert stmt.type === :expression_stmt
+    assert stmt.expression.type === :if_expression
+    test_infix_expression(stmt.expression.condition, "x", "<", "y")
+
+    then_branch = stmt.expression.then
+    assert then_branch.type === :block_stmt
+    test_identifier(hd(then_branch.statements).expression, "x")
+
+    assert stmt.expression.else === nil
+  end
+
+  test "parse if-else expressions" do
+    input = "if (x < y) { x } else { y }"
+
+    program = input |> Lexer.tokenize() |> Parser.parse_program()
+    assert program.errors === []
+
+    [stmt] = program.statements
+    assert stmt.type === :expression_stmt
+    assert stmt.expression.type === :if_expression
+    test_infix_expression(stmt.expression.condition, "x", "<", "y")
+
+    then_branch = stmt.expression.then
+    assert then_branch.type === :block_stmt
+    test_identifier(hd(then_branch.statements).expression, "x")
+
+    else_branch = stmt.expression.else
+    assert else_branch.type === :block_stmt
+    test_identifier(hd(else_branch.statements).expression, "y")
+  end
+
   defp test_let_stmt(stmt = %LetStmt{}, identifier_name) do
     assert stmt.type === :let_stmt
     assert stmt.name.value === identifier_name
