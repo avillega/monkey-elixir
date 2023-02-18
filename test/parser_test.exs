@@ -148,7 +148,10 @@ defmodule ParserTest do
       {"(5 + 5) * 2", "((5 + 5) * 2)"},
       {"2 / (5 + 5)", "(2 / (5 + 5))"},
       {"-(5 + 5)", "(-(5 + 5))"},
-      {"!(true == true)", "(!(true == true))"}
+      {"!(true == true)", "(!(true == true))"},
+      {"1 + add(b * c) + d", "((1 + add((b * c))) + d)"},
+      {"add(a, b, add(6 * 7))", "add(a, b, add((6 * 7)))"},
+      {"add((a + b) * c, d)", "add(((a + b) * c), d)"}
     ]
 
     Enum.each(tests, fn {input, expected} ->
@@ -208,6 +211,73 @@ defmodule ParserTest do
     else_branch = stmt.expression.else
     assert else_branch.type === :block_stmt
     test_identifier(hd(else_branch.statements).expression, "y")
+  end
+
+  test "parse function literal" do
+    input = "fn(x, y) {x + y; }"
+
+    program = input |> Lexer.tokenize() |> Parser.parse_program()
+    assert program.errors === []
+
+    [stmt] = program.statements
+    assert stmt.type === :expression_stmt
+
+    function = stmt.expression
+    assert function.type === :function_literal
+
+    assert length(function.params) === 2
+    [param1, param2] = function.params
+    test_identifier(param1, "x")
+    test_identifier(param2, "y")
+
+    [body] = function.body.statements
+    test_infix_expression(body.expression, "x", "+", "y")
+  end
+
+  test "parse function literal params edge cases" do
+    tests = [
+      {"fn() {}", []},
+      {"fn(x) {}", ["x"]},
+      {"fn(x, y) {}", ["x", "y"]},
+      {"fn(x, y, z) {}", ["x", "y", "z"]}
+    ]
+
+    Enum.each(tests, fn {input, expected_identifiers} ->
+      program = input |> Lexer.tokenize() |> Parser.parse_program()
+      assert program.errors === []
+
+      [stmt] = program.statements
+      assert stmt.type === :expression_stmt
+
+      function = stmt.expression
+      assert function.type === :function_literal
+
+      assert length(function.params) === length(expected_identifiers)
+
+      Enum.zip(function.params, expected_identifiers)
+      |> Enum.each(fn {ident, expected_ident} -> test_identifier(ident, expected_ident) end)
+    end)
+  end
+
+  test "parse call expression" do
+    input = "add(1, 2 * 3, 4 + 5);"
+
+    program = input |> Lexer.tokenize() |> Parser.parse_program()
+    assert program.errors === []
+
+    [stmt] = program.statements
+    assert stmt.type === :expression_stmt
+
+    call = stmt.expression
+    assert call.type === :call_expression
+
+    test_literal_expression(call.function, "add")
+
+    assert length(call.args) === 3
+    [arg1, arg2, arg3] = call.args
+    test_literal_expression(arg1, 1)
+    test_infix_expression(arg2, 2, "*", 3)
+    test_infix_expression(arg3, 4, "+", 5)
   end
 
   defp test_let_stmt(stmt = %LetStmt{}, identifier_name) do

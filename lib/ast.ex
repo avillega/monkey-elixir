@@ -115,4 +115,28 @@ defmodule AST do
       end
     end
   end
+
+  defmodule FunctionLiteral do
+    @enforce_keys [:params, :body]
+    # :params are a list of Identifiers, :body is a block stmt
+    defstruct [:params, :body, type: :function_literal]
+
+    defimpl String.Chars, for: __MODULE__ do
+      def to_string(expr) do
+        "fn(#{Enum.join(expr.params, ", ")}) #{expr.body}"
+      end
+    end
+  end
+
+  defmodule CallExpression do
+    @enforce_keys [:function, :args]
+    # :function is an expression, :args is a list of expressions
+    defstruct [:function, :args, type: :call_expression]
+
+    defimpl String.Chars, for: __MODULE__ do
+      def to_string(expr) do
+        "#{expr.function}(#{Enum.join(expr.args, ", ")})"
+      end
+    end
+  end
 end

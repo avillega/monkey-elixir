@@ -1,4 +1,6 @@
 defmodule Parser do
+  alias AST.CallExpression
+  alias AST.FunctionLiteral
   alias AST.BlockStmt
   alias AST.IfExpression
 
@@ -16,7 +18,7 @@ defmodule Parser do
 
   def parse_program(tokens) do
     {_, _, stmts, errors} = do_parse_stmts(tokens, [], [], fn _ -> false end)
-    %Program{statements: Enum.reverse(stmts), errors: errors}
+    %Program{statements: Enum.reverse(stmts), errors: Enum.reverse(errors)}
   end
 
   defp do_parse_stmts([], stmts, errors, _), do: {:ok, [], stmts, errors}
@@ -152,6 +154,7 @@ defmodule Parser do
       :minus -> :sum
       :star -> :product
       :slash -> :product
+      :lparen -> :call
       _ -> :lowest
     end
   end
@@ -198,6 +201,7 @@ defmodule Parser do
       false -> &parse_bool_literal/1
       :lparen -> &parse_group_expression/1
       :if -> &parse_if_expression/1
+      :fn -> &parse_function_literal/1
       _ -> nil
     end
   end
@@ -212,6 +216,7 @@ defmodule Parser do
       :minus -> &parse_infix_expression/2
       :star -> &parse_infix_expression/2
       :slash -> &parse_infix_expression/2
+      :lparen -> &parse_call_expression/2
       _ -> nil
     end
   end
@@ -268,6 +273,56 @@ defmodule Parser do
         _ ->
           {:ok, rest, %IfExpression{condition: condition, then: then}}
       end
+    end
+  end
+
+  defp parse_function_literal([_ | rest]) do
+    with {:ok, rest, _} <- expect_token(rest, :lparen),
+         {:ok, rest, params} <- parse_function_params(rest),
+         {:ok, rest, _} <- expect_token(rest, :lbrace),
+         {:ok, rest, body} <- parse_block_stmt(rest) do
+      {:ok, rest, %FunctionLiteral{params: params, body: body}}
+    end
+  end
+
+  defp parse_function_params(tokens) do
+    do_parse_function_params(tokens, [])
+  end
+
+  defp do_parse_function_params([%Token{type: :rparen} | rest], acc),
+    do: {:ok, rest, Enum.reverse(acc)}
+
+  defp do_parse_function_params([%Token{type: :comma} | rest], acc),
+    do: do_parse_function_params(rest, acc)
+
+  defp do_parse_function_params([%Token{type: :ident, lexeme: lexeme} | rest], acc),
+    do: do_parse_function_params(rest, [%Identifier{value: lexeme} | acc])
+
+  defp do_parse_function_params([%Token{lexeme: lexeme} | rest], _acc),
+    do: {:error, rest, "Unexpected token '#{lexeme}' when parsing function params"}
+
+  defp parse_call_expression([_token | rest], left) do
+    with {:ok, rest, args} <- parse_function_args(rest) do
+      {:ok, rest, %CallExpression{function: left, args: args}}
+    end
+  end
+
+  defp parse_function_args(tokens) do
+    do_parse_function_args(tokens, [])
+  end
+
+  defp do_parse_function_args([%Token{type: :rparen} | rest], acc),
+    do: {:ok, rest, Enum.reverse(acc)}
+
+  defp do_parse_function_args([%Token{type: :comma} | rest], acc) do
+    do_parse_function_args(rest, acc)
+  end
+
+  defp do_parse_function_args([], _acc), do: {:error, [], "malformed function call missing ')'"}
+
+  defp do_parse_function_args(tokens, acc) do
+    with {:ok, rest, expr} <- parse_expression(tokens, :lowest) do
+      do_parse_function_args(rest, [expr | acc])
     end
   end
 
