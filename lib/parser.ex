@@ -62,40 +62,21 @@ defmodule Parser do
     parse_expression_stmt(tokens)
   end
 
-  defp parse_let_stmt([%Token{type: :ident, lexeme: lexeme}, %Token{type: :assign} | rest]) do
-    identifier = %Identifier{value: lexeme}
-
-    # TODO: skip the expressions until we can parse it
-    rest =
-      Enum.drop_while(rest, fn
-        %Token{type: :semicolon} -> false
-        _ -> true
-      end)
-      |> Enum.drop(1)
-
-    {:ok, rest, %LetStmt{name: identifier, value: nil}}
-  end
-
-  defp parse_let_stmt([%Token{type: :ident}, %Token{lexeme: lexeme} | rest]) do
-    {:error, rest,
-     "Unexpected token #{lexeme} when parsing a let statemet expected an assigment (=)."}
-  end
-
-  defp parse_let_stmt([%Token{lexeme: lexeme} | rest]) do
-    {:error, rest,
-     "Unexpected token #{lexeme} when parsing a let statemet expected an identifier."}
+  defp parse_let_stmt(tokens) do
+    with {:ok, _, _} <- expect_token(tokens, :ident),
+         {:ok, rest, ident} <- parse_identifier(tokens),
+         {:ok, rest, _} <- expect_token(rest, :assign),
+         {:ok, rest, expr} <- parse_expression(rest, :lowest) do
+      rest = consume_token(rest, :semicolon)
+      {:ok, rest, %LetStmt{name: ident, value: expr}}
+    end
   end
 
   defp parse_return_stmt(tokens) do
-    # TODO: skip the expressions until we can parse it
-    rest =
-      Enum.drop_while(tokens, fn
-        %Token{type: :semicolon} -> false
-        _ -> true
-      end)
-      |> Enum.drop(1)
-
-    {:ok, rest, %ReturnStmt{ret_value: nil}}
+    with {:ok, rest, expr} <- parse_expression(tokens, :lowest) do
+      rest = consume_token(rest, :semicolon)
+      {:ok, rest, %ReturnStmt{ret_value: expr}}
+    end
   end
 
   defp parse_expression_stmt(tokens) do
@@ -330,4 +311,7 @@ defmodule Parser do
 
   defp expect_token([%Token{lexeme: lexeme} | rest], expected),
     do: {:error, rest, "Unexpected token, got #{lexeme}, expected #{expected}"}
+
+  defp consume_token([%Token{type: expected_type} | rest], expected_type), do: rest
+  defp consume_token(tokens, _), do: tokens
 end

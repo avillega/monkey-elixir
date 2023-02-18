@@ -9,29 +9,32 @@ defmodule ParserTest do
   test "parse let statements" do
     input = """
       let x = 5;
-      let y = 10;
-      let foobar = 838383;
+      let y = true;
+      let foobar = y;
     """
 
-    expectedIdentifiers = ["x", "y", "foobar"]
+    expected = [{"x", 5}, {"y", true}, {"foobar", "y"}]
 
     tokens = Lexer.tokenize(input)
     program = Parser.parse_program(tokens)
     assert program.errors == []
-    assert Enum.count(program.statements) === Enum.count(expectedIdentifiers)
+    assert Enum.count(program.statements) === Enum.count(expected)
 
-    Enum.zip(program.statements, expectedIdentifiers)
-    |> Enum.each(fn {stmt, expected_ident} ->
+    Enum.zip(program.statements, expected)
+    |> Enum.each(fn {stmt, {expected_ident, expected_val}} ->
       test_let_stmt(stmt, expected_ident)
+      test_literal_expression(stmt.value, expected_val)
     end)
   end
 
   test "parse return statements" do
     input = """
       return 5;
-      return 10;
-      return 838383;
+      return y;
+      return true;
     """
+
+    expected = [5, "y", true]
 
     tokens = Lexer.tokenize(input)
     program = Parser.parse_program(tokens)
@@ -39,8 +42,10 @@ defmodule ParserTest do
     assert Enum.count(program.statements) === 3
     assert program.errors === []
 
-    Enum.each(program.statements, fn stmt ->
+    Enum.zip(program.statements, expected)
+    |> Enum.each(fn {stmt, expected_val} ->
       assert stmt.type === :return_stmt
+      test_literal_expression(stmt.ret_value, expected_val)
     end)
   end
 
