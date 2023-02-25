@@ -1,6 +1,6 @@
 defmodule AST do
   defmodule Program do
-    defstruct statements: [], errors: []
+    defstruct type: :program, statements: [], errors: []
 
     defimpl String.Chars, for: __MODULE__ do
       def to_string(program), do: Enum.join(program.statements)

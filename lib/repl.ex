@@ -4,7 +4,7 @@ defmodule Repl do
     program = input |> Lexer.tokenize |> Parser.parse_program
 
     s = case program.errors do
-      [] -> "#{program}"
+      [] -> "#{Evaluator.eval(program)}"
       _ -> errors_string(program.errors) 
     end
 
