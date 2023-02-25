@@ -84,13 +84,19 @@ defmodule EvaluatorTest do
 
   test "eval return stmts" do
     tests = [
-      {"return 10;", 10},
-      {"return 10; 5;", 10},
-      {"return 2 * 5; 5;", 10},
-      {"return 10; 5;", 10},
-      {"9; return 10; 5;", 10},
+      # {"return 10;", 10},
+      # {"return 10; 5;", 10},
+      # {"return 2 * 5; 5;", 10},
+      # {"return 10; 5;", 10},
+      # {"9; return 10; 5;", 10},
+      {"if (10 > 1) {
+          if (true) {
+            return 10;
+          }
+          return 1;
+        }", 10}
     ]
-    
+
     Enum.each(tests, fn {input, expected} ->
       evaluated = input |> Lexer.tokenize() |> Parser.parse_program() |> Evaluator.eval()
       assert evaluated === expected

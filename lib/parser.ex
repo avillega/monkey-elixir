@@ -18,14 +18,15 @@ defmodule Parser do
 
   def parse_program(tokens) do
     {_, _, stmts, errors} = do_parse_stmts(tokens, [], [], fn _ -> false end)
-    %Program{statements: Enum.reverse(stmts), errors: Enum.reverse(errors)}
+    %Program{statements: stmts, errors: errors}
   end
 
-  defp do_parse_stmts([], stmts, errors, _), do: {:ok, [], stmts, errors}
+  defp do_parse_stmts([], stmts, errors, _),
+    do: {:ok, [], Enum.reverse(stmts), Enum.reverse(errors)}
 
   defp do_parse_stmts(tokens, stmts, errors, end_fn) do
     if end_fn.(tokens) do
-      {:ok, tokens, stmts, errors}
+      {:ok, tokens, Enum.reverse(stmts), Enum.reverse(errors)}
     else
       case next_statement(tokens) do
         {:ok, rest, nil} ->
@@ -35,7 +36,7 @@ defmodule Parser do
           do_parse_stmts(rest, [stmt | stmts], errors, end_fn)
 
         {:end, _, _} ->
-          {:ok, [], stmts, errors}
+          {:ok, [], Enum.reverse(stmts), Enum.reverse(errors)}
 
         {:error, rest, reasons} when is_list(reasons) ->
           do_parse_stmts(rest, stmts, reasons ++ errors, end_fn)
