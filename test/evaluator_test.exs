@@ -12,10 +12,7 @@ defmodule EvaluatorTest do
       {"-12", -12}
     ]
 
-    Enum.each(tests, fn {input, expected} ->
-      evaluated = input |> Lexer.tokenize() |> Parser.parse_program() |> Evaluator.eval()
-      assert evaluated === expected
-    end)
+    eval_and_test(tests)
   end
 
   test "eval bang operator" do
@@ -28,10 +25,7 @@ defmodule EvaluatorTest do
       {"!!false", false}
     ]
 
-    Enum.each(tests, fn {input, expected} ->
-      evaluated = input |> Lexer.tokenize() |> Parser.parse_program() |> Evaluator.eval()
-      assert evaluated === expected
-    end)
+    eval_and_test(tests)
   end
 
   test "eval infix operations" do
@@ -59,10 +53,7 @@ defmodule EvaluatorTest do
       {"(1 > 2) == false", true}
     ]
 
-    Enum.each(tests, fn {input, expected} ->
-      evaluated = input |> Lexer.tokenize() |> Parser.parse_program() |> Evaluator.eval()
-      assert evaluated === expected
-    end)
+    eval_and_test(tests)
   end
 
   test "eval if else expressions" do
@@ -76,19 +67,16 @@ defmodule EvaluatorTest do
       {"if (1 > 2) { 10 } else { 20 }", 20}
     ]
 
-    Enum.each(tests, fn {input, expected} ->
-      evaluated = input |> Lexer.tokenize() |> Parser.parse_program() |> Evaluator.eval()
-      assert evaluated === expected
-    end)
+    eval_and_test(tests)
   end
 
   test "eval return stmts" do
     tests = [
-      # {"return 10;", 10},
-      # {"return 10; 5;", 10},
-      # {"return 2 * 5; 5;", 10},
-      # {"return 10; 5;", 10},
-      # {"9; return 10; 5;", 10},
+      {"return 10;", 10},
+      {"return 10; 5;", 10},
+      {"return 2 * 5; 5;", 10},
+      {"return 10; 5;", 10},
+      {"9; return 10; 5;", 10},
       {"if (10 > 1) {
           if (true) {
             return 10;
@@ -97,9 +85,39 @@ defmodule EvaluatorTest do
         }", 10}
     ]
 
+    eval_and_test(tests)
+  end
+
+  test "error handling" do
+    tests = [
+      {"5 + true", "unknown operator: + for left: 5 and right: true"},
+      {"5 + true; 5;", "unknown operator: + for left: 5 and right: true"},
+      {"-true", "unknown operator: - for true"},
+      {"true + true", "unknown operator: + for left: true and right: true"},
+      {"5; 5 + true; 10;", "unknown operator: + for left: 5 and right: true"},
+      {"if (10 > 1) { true + false; }", "unknown operator: + for left: true and right: false"},
+      {"if (10 > 1) {
+          if (true) {
+            return true + false;
+          }
+          return 1;
+        }", "unknown operator: + for left: true and right: false"}
+    ]
+
+    eval_error(tests)
+  end
+
+  defp eval_and_test(tests) do
     Enum.each(tests, fn {input, expected} ->
       evaluated = input |> Lexer.tokenize() |> Parser.parse_program() |> Evaluator.eval()
-      assert evaluated === expected
+      assert evaluated === {:ok, expected}
+    end)
+  end
+
+  defp eval_error(tests) do
+    Enum.each(tests, fn {input, expected} ->
+      evaluated = input |> Lexer.tokenize() |> Parser.parse_program() |> Evaluator.eval() 
+      assert evaluated === {:error, expected}
     end)
   end
 end

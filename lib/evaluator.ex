@@ -1,8 +1,6 @@
 defmodule Evaluator do
   def eval(node) do
-    with {:ok, val} <- do_eval(node) do
-      val
-    end
+    do_eval(node)
   end
 
   defp do_eval(nil), do: {:ok, nil}
@@ -12,7 +10,7 @@ defmodule Evaluator do
       :program -> eval_program(node.statements)
       :block_stmt -> eval_block(node.statements)
       :expression_stmt -> do_eval(node.expression)
-      :return_stmt -> {:ret, eval(node.ret_value)}
+      :return_stmt -> eval_return_stmt(node)
       :int_literal -> {:ok, node.value}
       :bool_literal -> {:ok, node.value}
       :prefix_expression -> eval_prefix_expr(node)
@@ -33,25 +31,27 @@ defmodule Evaluator do
       end
     else
       {:ret, val} -> {:ok, val}
+      err -> err
     end
   end
 
   defp eval_block([stmt | rest]) do
-    with {:ok, val} <- dbg do_eval(stmt) do
+    with {:ok, val} <- do_eval(stmt) do
       if rest != [], do: eval_block(rest), else: {:ok, val}
     end
   end
 
+  defp eval_return_stmt(stmt) do
+    with {:ok, val} <- do_eval(stmt.ret_value), do: {:ret, val}
+  end
+
   defp eval_prefix_expr(node) do
     with {:ok, right} <- do_eval(node.right) do
-      result =
-        case node.operator do
-          "!" -> !right
-          "-" when is_integer(right) -> -right
-          _ -> nil
-        end
-
-      {:ok, result}
+      case node.operator do
+        "!" -> {:ok, !right}
+        "-" when is_integer(right) -> {:ok, -right}
+        _ -> {:error, "unknown operator: #{node.operator} for #{right}"}
+      end
     end
   end
 
@@ -63,31 +63,25 @@ defmodule Evaluator do
   end
 
   defp do_eval_infix_expr(operator, left, right) when is_number(left) and is_number(right) do
-    result =
-      case operator do
-        "+" -> left + right
-        "-" -> left - right
-        "*" -> left * right
-        "/" -> div(left, right)
-        "<" -> left < right
-        ">" -> left > right
-        "==" -> left == right
-        "!=" -> left != right
-        _ -> nil
-      end
-
-    {:ok, result}
+    case operator do
+      "+" -> {:ok, left + right}
+      "-" -> {:ok, left - right}
+      "*" -> {:ok, left * right}
+      "/" -> {:ok, div(left, right)}
+      "<" -> {:ok, left < right}
+      ">" -> {:ok, left > right}
+      "==" -> {:ok, left == right}
+      "!=" -> {:ok, left != right}
+      _ -> {:error, "unknown operator: #{operator} for left: #{left} and right: #{right}"}
+    end
   end
 
   defp do_eval_infix_expr(operator, left, right) do
-    result =
-      case operator do
-        "==" -> left == right
-        "!=" -> left != right
-        _ -> nil
-      end
-
-    {:ok, result}
+    case operator do
+      "==" -> {:ok, left == right}
+      "!=" -> {:ok, left != right}
+      _ -> {:error, "unknown operator: #{operator} for left: #{left} and right: #{right}"}
+    end
   end
 
   defp eval_if_expression(node) do
