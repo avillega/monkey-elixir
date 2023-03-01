@@ -1,96 +1,127 @@
 defmodule Evaluator do
-  def eval(node) do
-    do_eval(node)
+  defmodule Env do
+    # parent is another Env, m is the environment map
+    defstruct parent: nil, m: %{}
   end
 
-  defp do_eval(nil), do: {:ok, nil}
+  def eval(node, env = %Env{}) do
+    do_eval(node, env)
+  end
 
-  defp do_eval(node) do
+  defp do_eval(nil, env = %Env{}), do: {:ok, nil, env}
+
+  defp do_eval(node, env = %Env{}) do
     case node.type do
-      :program -> eval_program(node.statements)
-      :block_stmt -> eval_block(node.statements)
-      :expression_stmt -> do_eval(node.expression)
-      :return_stmt -> eval_return_stmt(node)
-      :int_literal -> {:ok, node.value}
-      :bool_literal -> {:ok, node.value}
-      :prefix_expression -> eval_prefix_expr(node)
-      :infix_expression -> eval_infix_expr(node)
-      :if_expression -> eval_if_expression(node)
-      :function_literal -> raise "unimplemented"
-      :call_expression -> raise "unimplemented"
-      _ -> nil
+      :program -> eval_program(node.statements, env)
+      :block_stmt -> eval_block(node.statements, env)
+      :expression_stmt -> do_eval(node.expression, env)
+      :return_stmt -> eval_return_stmt(node, env)
+      :let_stmt -> eval_let_stmt(node, env)
+      :int_literal -> {:ok, node.value, env}
+      :bool_literal -> {:ok, node.value, env}
+      :prefix_expression -> eval_prefix_expr(node, env)
+      :infix_expression -> eval_infix_expr(node, env)
+      :if_expression -> eval_if_expression(node, env)
+      :ident -> eval_ident(node, env)
+      _ -> raise "unimplemented for #{node.type}"
     end
   end
 
-  defp eval_program([stmt | rest]) do
-    with {:ok, val} <- do_eval(stmt) do
+  defp eval_program([stmt | rest], env) do
+    with {:ok, val, env} <- do_eval(stmt, env) do
       if rest != [] do
-        eval_program(rest)
+        eval_program(rest, env)
       else
-        {:ok, val}
+        {:ok, val, env}
       end
     else
-      {:ret, val} -> {:ok, val}
+      {:ret, val, env} -> {:ok, val, env}
       err -> err
     end
   end
 
-  defp eval_block([stmt | rest]) do
-    with {:ok, val} <- do_eval(stmt) do
-      if rest != [], do: eval_block(rest), else: {:ok, val}
+  defp eval_block([stmt | rest], env) do
+    with {:ok, val, env} <- do_eval(stmt, env) do
+      if rest != [], do: eval_block(rest, env), else: {:ok, val, env}
     end
   end
 
-  defp eval_return_stmt(stmt) do
-    with {:ok, val} <- do_eval(stmt.ret_value), do: {:ret, val}
+  defp eval_return_stmt(stmt, env) do
+    with {:ok, val, env} <- do_eval(stmt.ret_value, env), do: {:ret, val, env}
   end
 
-  defp eval_prefix_expr(node) do
-    with {:ok, right} <- do_eval(node.right) do
+  defp eval_let_stmt(stmt, env) do
+    with {:ok, val, env} <- do_eval(stmt.value, env) do
+      env = Map.update!(env, :m, &Map.put(&1, stmt.name.value, val))
+      {:ok, nil, env}
+    end
+  end
+
+  defp eval_prefix_expr(node, env) do
+    with {:ok, right, env} <- do_eval(node.right, env) do
       case node.operator do
-        "!" -> {:ok, !right}
-        "-" when is_integer(right) -> {:ok, -right}
-        _ -> {:error, "unknown operator: #{node.operator} for #{right}"}
+        "!" -> {:ok, !right, env}
+        "-" when is_integer(right) -> {:ok, -right, env}
+        _ -> {:error, "unknown operator: #{node.operator} for #{node.right}", env}
       end
     end
   end
 
-  defp eval_infix_expr(node) do
-    with {:ok, left} <- do_eval(node.left),
-         {:ok, right} <- do_eval(node.right) do
-      do_eval_infix_expr(node.operator, left, right)
+  defp eval_infix_expr(node, env) do
+    with {:ok, left, env} <- do_eval(node.left, env),
+         {:ok, right, env} <- do_eval(node.right, env),
+         val when val !== :error <- do_eval_infix_expr(node.operator, left, right) do
+      {:ok, val, env}
+    else
+      :error ->
+        {:error,
+         "unknown operator: #{node.operator} for left: #{node.left} and right: #{node.right}",
+         env}
     end
   end
 
   defp do_eval_infix_expr(operator, left, right) when is_number(left) and is_number(right) do
     case operator do
-      "+" -> {:ok, left + right}
-      "-" -> {:ok, left - right}
-      "*" -> {:ok, left * right}
-      "/" -> {:ok, div(left, right)}
-      "<" -> {:ok, left < right}
-      ">" -> {:ok, left > right}
-      "==" -> {:ok, left == right}
-      "!=" -> {:ok, left != right}
-      _ -> {:error, "unknown operator: #{operator} for left: #{left} and right: #{right}"}
+      "+" -> left + right
+      "-" -> left - right
+      "*" -> left * right
+      "/" -> div(left, right)
+      "<" -> left < right
+      ">" -> left > right
+      "==" -> left == right
+      "!=" -> left != right
+      _ -> :error
     end
   end
 
   defp do_eval_infix_expr(operator, left, right) do
     case operator do
-      "==" -> {:ok, left == right}
-      "!=" -> {:ok, left != right}
-      _ -> {:error, "unknown operator: #{operator} for left: #{left} and right: #{right}"}
+      "==" -> left == right
+      "!=" -> left != right
+      _ -> :error
     end
   end
 
-  defp eval_if_expression(node) do
-    with {:ok, condition} <- do_eval(node.condition) do
+  defp eval_if_expression(node, env) do
+    with {:ok, condition, env} <- do_eval(node.condition, env) do
       if is_truthy(condition) do
-        do_eval(node.then)
+        do_eval(node.then, env)
       else
-        do_eval(node.else)
+        do_eval(node.else, env)
       end
+    end
+  end
+
+  defp eval_ident(node, env) do
+    {code, val} = do_eval_ident(node, env)
+    {code, val, env}
+  end
+
+  defp do_eval_ident(node, env) do
+    case Map.get(env.m, node.value, :not_there) do
+      :not_there when env.parent !== nil -> do_eval_ident(node, env.parent)
+      :not_there -> {:error, "identifier not found: foobar"}
+      val -> {:ok, val}
     end
   end
 

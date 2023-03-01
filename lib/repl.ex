@@ -1,23 +1,24 @@
 defmodule Repl do
-  def loop() do
+  alias Evaluator.Env
+  def loop(env \\ %Env{}) do
     input = IO.gets(">> ")
     program = input |> Lexer.tokenize() |> Parser.parse_program()
 
-    s =
+    {s, env} =
       case program.errors do
         [] ->
-          with {:ok, val} <- Evaluator.eval(program) do
-            "#{val}"
+          with {:ok, val, env} <- Evaluator.eval(program, env) do
+            {"#{val}", env}
           else
-            {:error, msg} -> msg
+            {:error, msg, env} -> {msg, env}
           end
 
         _ ->
-          errors_string(program.errors)
+          {errors_string(program.errors), env}
       end
 
     IO.puts(s)
-    loop()
+    loop(env)
   end
 
   defp errors_string(errors), do: "Parser errors: #{Enum.join(errors, "\n")}"

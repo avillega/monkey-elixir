@@ -2,6 +2,8 @@ defmodule EvaluatorTest do
   use ExUnit.Case
   doctest Evaluator
 
+  alias Evaluator.Env
+
   test "eval basic literal" do
     tests = [
       {"5", 5},
@@ -101,23 +103,39 @@ defmodule EvaluatorTest do
             return true + false;
           }
           return 1;
-        }", "unknown operator: + for left: true and right: false"}
+        }", "unknown operator: + for left: true and right: false"},
+      {"foobar", "identifier not found: foobar"}
     ]
 
     eval_error(tests)
   end
 
+  test "eval let statements" do
+    tests = [
+      {"let a = 5; a;", 5},
+      {"let a = 5 * 5; a;", 25},
+      {"let a = 5; let b = a; b;", 5},
+      {"let a = 5; let b = a; let c = a + b + 5; c;", 15}
+    ]
+
+    eval_and_test(tests)
+  end
+
   defp eval_and_test(tests) do
     Enum.each(tests, fn {input, expected} ->
-      evaluated = input |> Lexer.tokenize() |> Parser.parse_program() |> Evaluator.eval()
-      assert evaluated === {:ok, expected}
+      {:ok, evaluated, _env} =
+        input |> Lexer.tokenize() |> Parser.parse_program() |> Evaluator.eval(%Env{})
+
+      assert evaluated === expected
     end)
   end
 
   defp eval_error(tests) do
     Enum.each(tests, fn {input, expected} ->
-      evaluated = input |> Lexer.tokenize() |> Parser.parse_program() |> Evaluator.eval() 
-      assert evaluated === {:error, expected}
+      {:error, evaluated, _env} =
+        input |> Lexer.tokenize() |> Parser.parse_program() |> Evaluator.eval(%Env{})
+
+      assert evaluated === expected
     end)
   end
 end
