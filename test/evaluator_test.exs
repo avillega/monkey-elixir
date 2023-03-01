@@ -121,6 +121,20 @@ defmodule EvaluatorTest do
     eval_and_test(tests)
   end
 
+  test "function struct" do
+    tests = [
+      {"fn() {  2; }", %{params: [], body: "{ 2 }"}},
+      {"fn(x) { x + 2; }", %{params: ["x"], body: "{ (x + 2) }"}},
+      {"fn(x, y) { x + y; }", %{params: ["x", "y"], body: "{ (x + y) }"}}
+    ]
+
+    Enum.each(tests, fn {input, expected_fn} ->
+      evaluated = input |> Lexer.tokenize() |> Parser.parse_program() |> Evaluator.eval(%Env{})
+      assert evaluated.params === expected_fn[:params]
+      assert "#{evaluated.body}" === expected_fn[:body]
+    end)
+  end
+
   defp eval_and_test(tests) do
     Enum.each(tests, fn {input, expected} ->
       {:ok, evaluated, _env} =

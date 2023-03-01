@@ -1,5 +1,6 @@
 defmodule Repl do
   alias Evaluator.Env
+
   def loop(env \\ %Env{}) do
     input = IO.gets(">> ")
     program = input |> Lexer.tokenize() |> Parser.parse_program()

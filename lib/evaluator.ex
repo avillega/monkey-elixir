@@ -4,6 +4,17 @@ defmodule Evaluator do
     defstruct parent: nil, m: %{}
   end
 
+  defmodule Fn do
+    @enforce_keys [:params, :body, :env]
+    defstruct [:params, :body, :env]
+
+    defimpl String.Chars, for: __MODULE__ do
+      def to_string(func) do
+        "fn(#{Enum.join(func.params, ", ")})\n#{func.body}"
+      end
+    end
+  end
+
   def eval(node, env = %Env{}) do
     do_eval(node, env)
   end
@@ -23,6 +34,7 @@ defmodule Evaluator do
       :infix_expression -> eval_infix_expr(node, env)
       :if_expression -> eval_if_expression(node, env)
       :ident -> eval_ident(node, env)
+      :function_literal -> eval_function_literal(node, env)
       _ -> raise "unimplemented for #{node.type}"
     end
   end
@@ -123,6 +135,14 @@ defmodule Evaluator do
       :not_there -> {:error, "identifier not found: foobar"}
       val -> {:ok, val}
     end
+  end
+
+  defp eval_function_literal(node, env) do
+    %Fn{
+      params: Enum.map(node.params, & &1.value),
+      body: node.body,
+      env: %Env{parent: env}
+    }
   end
 
   defp is_truthy(val) do
