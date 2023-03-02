@@ -35,6 +35,7 @@ defmodule Evaluator do
       :if_expression -> eval_if_expression(node, env)
       :ident -> eval_ident(node, env)
       :function_literal -> eval_function_literal(node, env)
+      :call_expression -> eval_call_expression(node, env)
       _ -> raise "unimplemented for #{node.type}"
     end
   end
@@ -132,17 +133,51 @@ defmodule Evaluator do
   defp do_eval_ident(node, env) do
     case Map.get(env.m, node.value, :not_there) do
       :not_there when env.parent !== nil -> do_eval_ident(node, env.parent)
-      :not_there -> {:error, "identifier not found: foobar"}
+      :not_there -> {:error, "identifier not found: #{node.value}"}
       val -> {:ok, val}
     end
   end
 
   defp eval_function_literal(node, env) do
-    %Fn{
-      params: Enum.map(node.params, & &1.value),
-      body: node.body,
-      env: %Env{parent: env}
-    }
+    {:ok,
+     %Fn{
+       params: Enum.map(node.params, & &1.value),
+       body: node.body,
+       env: env
+     }, env}
+  end
+
+  defp eval_call_expression(node, env) do
+    with {:ok, func = %Fn{}, env} <- do_eval(node.function, env),
+         {:ok, args, env} <- eval_args(node.args, env) do
+      new_m = Enum.zip(func.params, args) |> Map.new(& &1)
+      extended_env = %Env{parent: func.env, m: new_m}
+      evaluated = do_eval(func.body, extended_env)
+
+      case evaluated do
+        {:ret, val, _} -> {:ok, val, env}
+        {code, val, _} -> {code, val, env}
+      end
+    else
+      {:ok, not_func, env} -> {:error, "#{not_func} is not a function", env}
+      err -> err
+    end
+  end
+
+  defp eval_args(expressions, env) do
+    result =
+      Enum.reduce_while(expressions, {:ok, []}, fn expr, {:ok, acc} ->
+        with {:ok, val, _} <- do_eval(expr, env) do
+          {:cont, {:ok, [val | acc]}}
+        else
+          {:error, msg, _} -> {:halt, :error, msg}
+        end
+      end)
+
+    case result do
+      {:ok, acc} -> {:ok, Enum.reverse(acc), env}
+      {:error, msg} -> {:error, "error evaluating function args: #{msg}", env}
+    end
   end
 
   defp is_truthy(val) do

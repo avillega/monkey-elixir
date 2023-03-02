@@ -129,10 +129,62 @@ defmodule EvaluatorTest do
     ]
 
     Enum.each(tests, fn {input, expected_fn} ->
-      evaluated = input |> Lexer.tokenize() |> Parser.parse_program() |> Evaluator.eval(%Env{})
+      {:ok, evaluated, _} =
+        input |> Lexer.tokenize() |> Parser.parse_program() |> Evaluator.eval(%Env{})
+
       assert evaluated.params === expected_fn[:params]
       assert "#{evaluated.body}" === expected_fn[:body]
     end)
+  end
+
+  test "function call" do
+    tests = [
+      {"let two = fn() {  2; }; two();", 2},
+      {"let addTwo = fn(x) { x + 2; }; addTwo(5);", 7},
+      {"fn(x) { x; }(3);", 3},
+      {"let mult = fn(x, y) { x * y; }; mult(3, 5);", 15},
+      {"let ident = fn(x) { x; }; ident(3);", 3},
+      {"let earlyRet = fn(x) {
+          if (10 > 1) {
+            return 120;
+          }
+          return x;
+        };
+        earlyRet(400);", 120}
+    ]
+
+    eval_and_test(tests)
+  end
+
+  test "eval closures" do
+    tests = [
+      {"let a = 5;
+       let addclosure = fn(x) { x + a; };
+       addclosure(20);
+      ", 25},
+      {"let a = 5;
+       let dontOverwrite = fn() { 
+          let a = 120;
+          a;
+       };
+       dontOverwrite();
+       a;
+      ", 5},
+      {"let a = 5;
+       let useLocal = fn(a) { 
+          a;
+       };
+       useLocal(120);
+      ", 120},
+      {"let newAdder = fn(x) {
+          fn (y) { x + y; };
+        };
+        let addTwo = newAdder(2);
+        addTwo(5);
+       ", 7}
+    ]
+
+    eval_and_test(tests)
   end
 
   defp eval_and_test(tests) do
