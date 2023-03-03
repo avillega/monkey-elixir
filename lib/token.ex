@@ -28,6 +28,7 @@ defmodule Token do
     false,
     :return,
     :int,
+    :string,
     :eof,
     :illegal
   ]

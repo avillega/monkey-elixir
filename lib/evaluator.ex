@@ -1,4 +1,16 @@
 defmodule Evaluator do
+  defmodule Builtins do
+    def len(args) do
+      case args do
+        [s] when is_binary(s) -> {:ok, String.length(s)}
+        [_] -> {:error, "argument for len not supported"}
+        _ -> {:error, "unexpected number of args for len"}
+      end
+    end
+  end
+
+  @builtins MapSet.new([:len])
+
   defmodule Env do
     # parent is another Env, m is the environment map
     defstruct parent: nil, m: %{}
@@ -36,6 +48,7 @@ defmodule Evaluator do
       :ident -> eval_ident(node, env)
       :function_literal -> eval_function_literal(node, env)
       :call_expression -> eval_call_expression(node, env)
+      :string_literal -> eval_string_literal(node, env)
       _ -> raise "unimplemented for #{node.type}"
     end
   end
@@ -107,6 +120,10 @@ defmodule Evaluator do
     end
   end
 
+  defp do_eval_infix_expr("+", left, right) when is_binary(left) and is_binary(right) do
+    left <> right
+  end
+
   defp do_eval_infix_expr(operator, left, right) do
     case operator do
       "==" -> left == right
@@ -132,9 +149,20 @@ defmodule Evaluator do
 
   defp do_eval_ident(node, env) do
     case Map.get(env.m, node.value, :not_there) do
-      :not_there when env.parent !== nil -> do_eval_ident(node, env.parent)
-      :not_there -> {:error, "identifier not found: #{node.value}"}
-      val -> {:ok, val}
+      :not_there when env.parent !== nil ->
+        do_eval_ident(node, env.parent)
+
+      :not_there ->
+        atom = String.to_atom(node.value)
+
+        if MapSet.member?(@builtins, atom) do
+          {:ok, {:builtin, atom}}
+        else
+          {:error, "identifier not found: #{node.value}"}
+        end
+
+      val ->
+        {:ok, val}
     end
   end
 
@@ -147,19 +175,34 @@ defmodule Evaluator do
      }, env}
   end
 
-  defp eval_call_expression(node, env) do
-    with {:ok, func = %Fn{}, env} <- do_eval(node.function, env),
-         {:ok, args, env} <- eval_args(node.args, env) do
-      new_m = Enum.zip(func.params, args) |> Map.new(& &1)
-      extended_env = %Env{parent: func.env, m: new_m}
-      evaluated = do_eval(func.body, extended_env)
+  defp create_callee(func = %Fn{}) do
+    {:ok,
+     fn args ->
+       new_m = Enum.zip(func.params, args) |> Map.new(& &1)
+       extended_env = %Env{parent: func.env, m: new_m}
+       do_eval(func.body, extended_env)
+     end}
+  end
 
-      case evaluated do
-        {:ret, val, _} -> {:ok, val, env}
-        {code, val, _} -> {code, val, env}
-      end
+  defp create_callee({:builtin, name}) do
+    {:ok,
+     fn args ->
+       {code, result} = apply(Builtins, name, [args])
+       {code, result, nil}
+     end}
+  end
+
+  defp create_callee(_), do: {:error, "Callee is not a callable function"}
+
+  defp eval_call_expression(node, env) do
+    with {:ok, val, _env} <- do_eval(node.function, env),
+         {:ok, callee} <- create_callee(val),
+         {:ok, args, _env} <- eval_args(node.args, env),
+         {:ok, result, _} <- callee.(args) do
+      {:ok, result, env}
     else
-      {:ok, not_func, env} -> {:error, "#{not_func} is not a function", env}
+      {:ret, val, _} -> {:ok, val, env}
+      {:error, msg} -> {:error, msg, env}
       err -> err
     end
   end
@@ -178,6 +221,10 @@ defmodule Evaluator do
       {:ok, acc} -> {:ok, Enum.reverse(acc), env}
       {:error, msg} -> {:error, "error evaluating function args: #{msg}", env}
     end
+  end
+
+  def eval_string_literal(expr, env) do
+    {:ok, expr.value, env}
   end
 
   defp is_truthy(val) do

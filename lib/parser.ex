@@ -1,4 +1,5 @@
 defmodule Parser do
+  alias AST.StringLiteral
   alias AST.CallExpression
   alias AST.FunctionLiteral
   alias AST.BlockStmt
@@ -184,6 +185,7 @@ defmodule Parser do
       :lparen -> &parse_group_expression/1
       :if -> &parse_if_expression/1
       :fn -> &parse_function_literal/1
+      :string -> &parse_string_literal/1
       _ -> nil
     end
   end
@@ -306,6 +308,10 @@ defmodule Parser do
     with {:ok, rest, expr} <- parse_expression(tokens, :lowest) do
       do_parse_function_args(rest, [expr | acc])
     end
+  end
+
+  defp parse_string_literal([token | rest]) do
+    {:ok, rest, %StringLiteral{value: token.lexeme}}
   end
 
   defp expect_token([%Token{type: expected_type} | rest], expected_type), do: {:ok, rest, nil}

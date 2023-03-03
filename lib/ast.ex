@@ -139,4 +139,14 @@ defmodule AST do
       end
     end
   end
+
+  defmodule StringLiteral do
+    @enforce_keys [:value]
+    # :value is boolean
+    defstruct [:value, type: :string_literal]
+
+    defimpl String.Chars, for: __MODULE__ do
+      def to_string(expr), do: "\"#{expr.value}\""
+    end
+  end
 end

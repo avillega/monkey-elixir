@@ -48,6 +48,10 @@ defmodule Lexer do
   def next_token(<<"false" <> rest>>), do: {rest, Token.create(false, "false")}
   def next_token(<<"return" <> rest>>), do: {rest, Token.create(:return, "return")}
 
+  def next_token(<<"\"" <> rest>>) do 
+    read_string(rest)
+  end
+
   def next_token(input = <<ch, _::binary>>) when is_digit(ch) do
     read_int(input)
   end
@@ -70,5 +74,11 @@ defmodule Lexer do
   defp read_ident(input) do
     [_, ident, rest] = Regex.split(~r{([A-Za-z]+)}, input, include_captures: true, parts: 2)
     {rest, Token.create(:ident, ident)}
+  end
+
+  # The first double-quote has been already consumed
+  defp read_string(input) do
+    [str, rest] = String.split(input, "\"", parts: 2)
+    {rest, Token.create(:string, str)}
   end
 end

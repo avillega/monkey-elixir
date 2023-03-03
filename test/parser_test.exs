@@ -4,6 +4,7 @@ defmodule ParserTest do
   alias AST.InfixExpression
   alias AST.BoolLiteral
   alias AST.Identifier
+  alias AST.StringLiteral
   alias AST.{LetStmt, IntLiteral}
 
   test "parse let statements" do
@@ -112,7 +113,8 @@ defmodule ParserTest do
       {"42 != 43;", {42, "!=", 43}},
       {"true == true", {true, "==", true}},
       {"false != true", {false, "!=", true}},
-      {"false == false", {false, "==", false}}
+      {"false == false", {false, "==", false}},
+      {"\"Hello\" + \"Hello\"", {"Hello", "+", "Hello"}}
     ]
 
     Enum.each(tests, fn
@@ -285,6 +287,20 @@ defmodule ParserTest do
     test_infix_expression(arg3, 4, "+", 5)
   end
 
+  test "parse strings" do
+    input = "\"Hello World\"; \"foobar\";"
+
+    expected = ["Hello World", "foobar"]
+
+    program = input |> Lexer.tokenize() |> Parser.parse_program()
+
+    assert program.errors === []
+    assert Enum.count(program.statements) === Enum.count(expected)
+
+    Enum.zip(program.statements, expected)
+    |> Enum.each(fn {stmt, expected} -> test_string_literal(stmt.expression, expected) end)
+  end
+
   defp test_let_stmt(stmt = %LetStmt{}, identifier_name) do
     assert stmt.type === :let_stmt
     assert stmt.name.value === identifier_name
@@ -305,11 +321,17 @@ defmodule ParserTest do
     assert literal.value === expected_val
   end
 
+  defp test_string_literal(literal = %StringLiteral{}, expected_val) do
+    assert literal.type === :string_literal
+    assert literal.value === expected_val
+  end
+
   defp test_literal_expression(expr, expected) do
     case expr do
       %IntLiteral{} -> test_int_literal(expr, expected)
       %Identifier{} -> test_identifier(expr, expected)
       %BoolLiteral{} -> test_bool_literal(expr, expected)
+      %StringLiteral{} -> test_string_literal(expr, expected)
     end
   end
 

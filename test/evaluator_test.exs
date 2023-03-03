@@ -11,7 +11,8 @@ defmodule EvaluatorTest do
       {"true", true},
       {"false", false},
       {"-5", -5},
-      {"-12", -12}
+      {"-12", -12},
+      {"\"Hello World!\"", "Hello World!"}
     ]
 
     eval_and_test(tests)
@@ -52,7 +53,8 @@ defmodule EvaluatorTest do
       {"(1 < 2) == true", true},
       {"(1 < 2) == false", false},
       {"(1 > 2) == true", false},
-      {"(1 > 2) == false", true}
+      {"(1 > 2) == false", true},
+      {"\"Hello\" + \"World\"", "HelloWorld"}
     ]
 
     eval_and_test(tests)
@@ -104,7 +106,10 @@ defmodule EvaluatorTest do
           }
           return 1;
         }", "unknown operator: + for left: true and right: false"},
-      {"foobar", "identifier not found: foobar"}
+      {"foobar", "identifier not found: foobar"},
+      {"1 + \"foobar\"", "unknown operator: + for left: 1 and right: \"foobar\""},
+      {"len(1)", "argument for len not supported"},
+      {"len(\"foo\", \"bar\")", "unexpected number of args for len"}
     ]
 
     eval_error(tests)
@@ -150,7 +155,14 @@ defmodule EvaluatorTest do
           }
           return x;
         };
-        earlyRet(400);", 120}
+        earlyRet(400);", 120},
+      {"let notEarlyRet = fn(x) {
+          if (10 < 1) {
+            return 120;
+          }
+          return x;
+        };
+        notEarlyRet(400);", 400}
     ]
 
     eval_and_test(tests)
@@ -182,6 +194,15 @@ defmodule EvaluatorTest do
         let addTwo = newAdder(2);
         addTwo(5);
        ", 7}
+    ]
+
+    eval_and_test(tests)
+  end
+
+  test "built-in functions" do
+    tests = [
+      {"len(\"Hello\")", 5},
+      {"len(\"\")", 0}
     ]
 
     eval_and_test(tests)
