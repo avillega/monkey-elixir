@@ -155,7 +155,7 @@ defmodule Evaluator do
       :not_there ->
         atom = String.to_atom(node.value)
 
-        if MapSet.member?(@builtins, atom) do
+        if function_exported?(Builtins, atom, 1) do
           {:ok, {:builtin, atom}}
         else
           {:error, "identifier not found: #{node.value}"}

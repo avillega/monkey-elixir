@@ -48,7 +48,7 @@ defmodule Lexer do
   def next_token(<<"false" <> rest>>), do: {rest, Token.create(false, "false")}
   def next_token(<<"return" <> rest>>), do: {rest, Token.create(:return, "return")}
 
-  def next_token(<<"\"" <> rest>>) do 
+  def next_token(<<"\"" <> rest>>) do
     read_string(rest)
   end
 
