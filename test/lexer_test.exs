@@ -46,6 +46,7 @@ defmodule LexerTest do
     10 != 9;
     "foobar";
     "foo bar";
+    [10 2 "hello"];
     """
 
     expected = [
@@ -125,6 +126,12 @@ defmodule LexerTest do
       %Token{type: :string, lexeme: "foobar"},
       %Token{type: :semicolon, lexeme: ";"},
       %Token{type: :string, lexeme: "foo bar"},
+      %Token{type: :semicolon, lexeme: ";"},
+      %Token{type: :lbracket, lexeme: "["},
+      %Token{type: :int, lexeme: "10"},
+      %Token{type: :int, lexeme: "2"},
+      %Token{type: :int, lexeme: "hello"},
+      %Token{type: :rbracket, lexeme: "]"},
       %Token{type: :semicolon, lexeme: ";"},
       %Token{type: :eof, lexeme: ""}
     ]

@@ -9,8 +9,6 @@ defmodule Evaluator do
     end
   end
 
-  @builtins MapSet.new([:len])
-
   defmodule Env do
     # parent is another Env, m is the environment map
     defstruct parent: nil, m: %{}
@@ -155,7 +153,7 @@ defmodule Evaluator do
       :not_there ->
         atom = String.to_atom(node.value)
 
-        if function_exported?(Builtins, atom, 1) do
+        if function_exported?(Evaluator.Builtins, atom, 1) do
           {:ok, {:builtin, atom}}
         else
           {:error, "identifier not found: #{node.value}"}

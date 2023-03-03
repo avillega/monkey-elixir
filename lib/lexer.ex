@@ -32,6 +32,8 @@ defmodule Lexer do
   def next_token(<<")" <> rest>>), do: {rest, Token.create(:rparen, ")")}
   def next_token(<<"{" <> rest>>), do: {rest, Token.create(:lbrace, "{")}
   def next_token(<<"}" <> rest>>), do: {rest, Token.create(:rbrace, "}")}
+  def next_token(<<"[" <> rest>>), do: {rest, Token.create(:lbracket, "[")}
+  def next_token(<<"]" <> rest>>), do: {rest, Token.create(:rbracket, "]")}
   def next_token(<<"," <> rest>>), do: {rest, Token.create(:comma, ",")}
   def next_token(<<";" <> rest>>), do: {rest, Token.create(:semicolon, ";")}
   def next_token(<<"+" <> rest>>), do: {rest, Token.create(:plus, "+")}
