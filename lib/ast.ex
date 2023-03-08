@@ -149,4 +149,14 @@ defmodule AST do
       def to_string(expr), do: "\"#{expr.value}\""
     end
   end
+
+  defmodule ArrayLiteral do
+    @enforce_keys [:expressions]
+    # :value is boolean
+    defstruct [:expressions, type: :array_literal]
+
+    defimpl String.Chars, for: __MODULE__ do
+      def to_string(expr), do: "[#{Enum.join(expr.expressions, ",")}]"
+    end
+  end
 end

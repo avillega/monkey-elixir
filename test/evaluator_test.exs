@@ -18,6 +18,14 @@ defmodule EvaluatorTest do
     eval_and_test(tests)
   end
 
+  test "eval array literal" do
+    input = "[1, 2, 2 + 2, \"foo\", true];" 
+    expected = [1, 2, 4, "foo", true]
+
+    {:ok, evaluated, _env} = input |> Lexer.tokenize |> Parser.parse_program |> Evaluator.eval(%Env{})
+    assert expected === evaluated
+  end
+
   test "eval bang operator" do
     tests = [
       {"!5", false},

@@ -287,7 +287,7 @@ defmodule ParserTest do
     test_infix_expression(arg3, 4, "+", 5)
   end
 
-  test "parse strings" do
+  test "parse strings literals" do
     input = "\"Hello World\"; \"foobar\";"
 
     expected = ["Hello World", "foobar"]
@@ -299,6 +299,26 @@ defmodule ParserTest do
 
     Enum.zip(program.statements, expected)
     |> Enum.each(fn {stmt, expected} -> test_string_literal(stmt.expression, expected) end)
+  end
+
+  test "parse arrayliterals" do
+    input = "[1, 2, 3, \"foo bar\"];"
+
+    expected = [[1, 2, 3, "foo bar"]]
+
+    program = input |> Lexer.tokenize() |> Parser.parse_program()
+
+    assert program.errors === []
+    assert Enum.count(program.statements) === Enum.count(expected)
+
+    Enum.zip(program.statements, expected)
+    |> Enum.each(fn {stmt, expected} ->
+      expressions = stmt.expression.expressions
+      assert length(expressions) === length(expected)
+
+      Enum.zip(expressions, expected)
+      |> Enum.each(fn {expr, expect} -> test_literal_expression(expr, expect) end)
+    end)
   end
 
   defp test_let_stmt(stmt = %LetStmt{}, identifier_name) do

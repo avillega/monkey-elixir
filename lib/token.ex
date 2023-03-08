@@ -12,6 +12,8 @@ defmodule Token do
     :rparen,
     :lbrace,
     :rbrace,
+    :lbracket,
+    :rbracket,
     :comma,
     :semicolon,
     :plus,

@@ -1,13 +1,5 @@
 defmodule Evaluator do
-  defmodule Builtins do
-    def len(args) do
-      case args do
-        [s] when is_binary(s) -> {:ok, String.length(s)}
-        [_] -> {:error, "argument for len not supported"}
-        _ -> {:error, "unexpected number of args for len"}
-      end
-    end
-  end
+  @builtins MapSet.new([:len])
 
   defmodule Env do
     # parent is another Env, m is the environment map
@@ -25,17 +17,13 @@ defmodule Evaluator do
     end
   end
 
+  def eval(nil, env = %Env{}), do: {:ok, nil, env}
+
   def eval(node, env = %Env{}) do
-    do_eval(node, env)
-  end
-
-  defp do_eval(nil, env = %Env{}), do: {:ok, nil, env}
-
-  defp do_eval(node, env = %Env{}) do
     case node.type do
       :program -> eval_program(node.statements, env)
       :block_stmt -> eval_block(node.statements, env)
-      :expression_stmt -> do_eval(node.expression, env)
+      :expression_stmt -> eval(node.expression, env)
       :return_stmt -> eval_return_stmt(node, env)
       :let_stmt -> eval_let_stmt(node, env)
       :int_literal -> {:ok, node.value, env}
@@ -47,12 +35,13 @@ defmodule Evaluator do
       :function_literal -> eval_function_literal(node, env)
       :call_expression -> eval_call_expression(node, env)
       :string_literal -> eval_string_literal(node, env)
+      :array_literal -> eval_array_literal(node, env)
       _ -> raise "unimplemented for #{node.type}"
     end
   end
 
   defp eval_program([stmt | rest], env) do
-    with {:ok, val, env} <- do_eval(stmt, env) do
+    with {:ok, val, env} <- eval(stmt, env) do
       if rest != [] do
         eval_program(rest, env)
       else
@@ -65,24 +54,24 @@ defmodule Evaluator do
   end
 
   defp eval_block([stmt | rest], env) do
-    with {:ok, val, env} <- do_eval(stmt, env) do
+    with {:ok, val, env} <- eval(stmt, env) do
       if rest != [], do: eval_block(rest, env), else: {:ok, val, env}
     end
   end
 
   defp eval_return_stmt(stmt, env) do
-    with {:ok, val, env} <- do_eval(stmt.ret_value, env), do: {:ret, val, env}
+    with {:ok, val, env} <- eval(stmt.ret_value, env), do: {:ret, val, env}
   end
 
   defp eval_let_stmt(stmt, env) do
-    with {:ok, val, env} <- do_eval(stmt.value, env) do
+    with {:ok, val, env} <- eval(stmt.value, env) do
       env = Map.update!(env, :m, &Map.put(&1, stmt.name.value, val))
       {:ok, nil, env}
     end
   end
 
   defp eval_prefix_expr(node, env) do
-    with {:ok, right, env} <- do_eval(node.right, env) do
+    with {:ok, right, env} <- eval(node.right, env) do
       case node.operator do
         "!" -> {:ok, !right, env}
         "-" when is_integer(right) -> {:ok, -right, env}
@@ -92,8 +81,8 @@ defmodule Evaluator do
   end
 
   defp eval_infix_expr(node, env) do
-    with {:ok, left, env} <- do_eval(node.left, env),
-         {:ok, right, env} <- do_eval(node.right, env),
+    with {:ok, left, env} <- eval(node.left, env),
+         {:ok, right, env} <- eval(node.right, env),
          val when val !== :error <- do_eval_infix_expr(node.operator, left, right) do
       {:ok, val, env}
     else
@@ -131,11 +120,11 @@ defmodule Evaluator do
   end
 
   defp eval_if_expression(node, env) do
-    with {:ok, condition, env} <- do_eval(node.condition, env) do
+    with {:ok, condition, env} <- eval(node.condition, env) do
       if is_truthy(condition) do
-        do_eval(node.then, env)
+        eval(node.then, env)
       else
-        do_eval(node.else, env)
+        eval(node.else, env)
       end
     end
   end
@@ -153,7 +142,7 @@ defmodule Evaluator do
       :not_there ->
         atom = String.to_atom(node.value)
 
-        if function_exported?(Evaluator.Builtins, atom, 1) do
+        if MapSet.member?(@builtins, atom) do
           {:ok, {:builtin, atom}}
         else
           {:error, "identifier not found: #{node.value}"}
@@ -178,7 +167,7 @@ defmodule Evaluator do
      fn args ->
        new_m = Enum.zip(func.params, args) |> Map.new(& &1)
        extended_env = %Env{parent: func.env, m: new_m}
-       do_eval(func.body, extended_env)
+       eval(func.body, extended_env)
      end}
   end
 
@@ -193,9 +182,9 @@ defmodule Evaluator do
   defp create_callee(_), do: {:error, "Callee is not a callable function"}
 
   defp eval_call_expression(node, env) do
-    with {:ok, val, _env} <- do_eval(node.function, env),
+    with {:ok, val, _env} <- eval(node.function, env),
          {:ok, callee} <- create_callee(val),
-         {:ok, args, _env} <- eval_args(node.args, env),
+         {:ok, args, _env} <- eval_expressions(node.args, env),
          {:ok, result, _} <- callee.(args) do
       {:ok, result, env}
     else
@@ -205,10 +194,10 @@ defmodule Evaluator do
     end
   end
 
-  defp eval_args(expressions, env) do
+  defp eval_expressions(expressions, env) do
     result =
       Enum.reduce_while(expressions, {:ok, []}, fn expr, {:ok, acc} ->
-        with {:ok, val, _} <- do_eval(expr, env) do
+        with {:ok, val, _} <- eval(expr, env) do
           {:cont, {:ok, [val | acc]}}
         else
           {:error, msg, _} -> {:halt, :error, msg}
@@ -221,9 +210,14 @@ defmodule Evaluator do
     end
   end
 
-  def eval_string_literal(expr, env) do
+  defp eval_string_literal(expr, env) do
     {:ok, expr.value, env}
   end
+
+  defp eval_array_literal(expr, env) do
+    eval_expressions(expr.expressions, env)
+  end
+
 
   defp is_truthy(val) do
     case val do

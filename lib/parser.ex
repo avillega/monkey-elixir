@@ -1,4 +1,5 @@
 defmodule Parser do
+  alias AST.ArrayLiteral
   alias AST.StringLiteral
   alias AST.CallExpression
   alias AST.FunctionLiteral
@@ -183,6 +184,7 @@ defmodule Parser do
       true -> &parse_bool_literal/1
       false -> &parse_bool_literal/1
       :lparen -> &parse_group_expression/1
+      :lbracket -> &parse_array_literal/1
       :if -> &parse_if_expression/1
       :fn -> &parse_function_literal/1
       :string -> &parse_string_literal/1
@@ -312,6 +314,27 @@ defmodule Parser do
 
   defp parse_string_literal([token | rest]) do
     {:ok, rest, %StringLiteral{value: token.lexeme}}
+  end
+
+  defp parse_array_literal([_ | tokens]) do
+    with {:ok, rest, exprs} <- parse_expr_list(tokens, []) do
+      {:ok, rest, %ArrayLiteral{expressions: exprs}}
+    end
+  end
+
+  defp parse_expr_list([%Token{type: :rbracket} | rest], acc),
+    do: {:ok, rest, Enum.reverse(acc)}
+
+  defp parse_expr_list([%Token{type: :comma} | rest], acc) do
+    parse_expr_list(rest, acc)
+  end
+
+  defp parse_expr_list([], _acc), do: {:error, [], "malformed array"}
+
+  defp parse_expr_list(tokens, acc) do
+    with {:ok, rest, expr} <- parse_expression(tokens, :lowest) do
+      parse_expr_list(rest, [expr | acc])
+    end
   end
 
   defp expect_token([%Token{type: expected_type} | rest], expected_type), do: {:ok, rest, nil}
