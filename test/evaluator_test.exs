@@ -26,6 +26,14 @@ defmodule EvaluatorTest do
     assert expected === evaluated
   end
 
+  test "eval access expression" do
+    tests = [
+      {"[1, 2, 2 + 2, \"foo\", true][2];", 4},
+    ]
+
+    eval_and_test(tests)
+  end
+
   test "eval bang operator" do
     tests = [
       {"!5", false},
@@ -117,7 +125,8 @@ defmodule EvaluatorTest do
       {"foobar", "identifier not found: foobar"},
       {"1 + \"foobar\"", "unknown operator: + for left: 1 and right: \"foobar\""},
       {"len(1)", "argument for len not supported"},
-      {"len(\"foo\", \"bar\")", "unexpected number of args for len"}
+      {"len(\"foo\", \"bar\")", "unexpected number of args for len"},
+      {"\"string\"[2];", "unknow access operation for string"},
     ]
 
     eval_error(tests)

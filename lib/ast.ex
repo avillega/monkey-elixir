@@ -152,11 +152,22 @@ defmodule AST do
 
   defmodule ArrayLiteral do
     @enforce_keys [:expressions]
-    # :value is boolean
+    #TODO: add explain comment
     defstruct [:expressions, type: :array_literal]
 
     defimpl String.Chars, for: __MODULE__ do
       def to_string(expr), do: "[#{Enum.join(expr.expressions, ",")}]"
+    end
+  end
+
+  
+  defmodule AccessExpression do
+    @enforce_keys [:array, :index]
+    # array is an expr and index is an expression
+    defstruct [:array, :index, type: :access_expression]
+
+    defimpl String.Chars, for: __MODULE__ do
+      def to_string(expr), do: "(#{expr.array}[#{expr.index}])"
     end
   end
 end

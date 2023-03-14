@@ -2,6 +2,7 @@ defmodule Token do
   @enforce_keys [:type, :lexeme]
   defstruct [:type, :lexeme]
 
+
   @types [
     :ident,
     :assign,

@@ -15,7 +15,8 @@ defmodule Parser do
     IntLiteral,
     PrefixExpression,
     InfixExpression,
-    BoolLiteral
+    BoolLiteral,
+    AccessExpression
   }
 
   def parse_program(tokens) do
@@ -121,6 +122,7 @@ defmodule Parser do
       :product -> 4
       :prefix -> 5
       :call -> 6
+      :access -> 7
     end
   end
 
@@ -139,6 +141,7 @@ defmodule Parser do
       :star -> :product
       :slash -> :product
       :lparen -> :call
+      :lbracket -> :access
       _ -> :lowest
     end
   end
@@ -203,6 +206,7 @@ defmodule Parser do
       :star -> &parse_infix_expression/2
       :slash -> &parse_infix_expression/2
       :lparen -> &parse_call_expression/2
+      :lbracket -> &parse_access_expression/2
       _ -> nil
     end
   end
@@ -319,6 +323,13 @@ defmodule Parser do
   defp parse_array_literal([_ | tokens]) do
     with {:ok, rest, exprs} <- parse_expr_list(tokens, []) do
       {:ok, rest, %ArrayLiteral{expressions: exprs}}
+    end
+  end
+
+  defp parse_access_expression([_token | rest], left) do
+    with {:ok, rest, expr} <- parse_expression(rest,  :lowest),
+          {:ok, rest,  _} <- expect_token(rest, :rbracket) do 
+      {:ok, rest, %AccessExpression{array: left, index: expr}}
     end
   end
 

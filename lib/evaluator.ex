@@ -36,6 +36,7 @@ defmodule Evaluator do
       :call_expression -> eval_call_expression(node, env)
       :string_literal -> eval_string_literal(node, env)
       :array_literal -> eval_array_literal(node, env)
+      :access_expression -> eval_access_expression(node, env)
       _ -> raise "unimplemented for #{node.type}"
     end
   end
@@ -218,6 +219,16 @@ defmodule Evaluator do
     eval_expressions(expr.expressions, env)
   end
 
+  def eval_access_expression(expr, env) do
+    with {:ok, array, env} <- eval(expr.array, env),
+         {:ok, index, env} <- eval(expr.index, env) do
+      cond do
+        is_list(array) && is_number(index) -> {:ok, Enum.at(array, index), env}
+        !is_list(array) -> {:error, "unknow access operation for #{array}", env}
+        !is_number(index) ->  {:error, "cannot access array using #{index}", env}
+      end
+    end
+  end
 
   defp is_truthy(val) do
     case val do

@@ -158,7 +158,9 @@ defmodule ParserTest do
       {"!(true == true)", "(!(true == true))"},
       {"1 + add(b * c) + d", "((1 + add((b * c))) + d)"},
       {"add(a, b, add(6 * 7))", "add(a, b, add((6 * 7)))"},
-      {"add((a + b) * c, d)", "add(((a + b) * c), d)"}
+      {"add((a + b) * c, d)", "add(((a + b) * c), d)"},
+      {"arr[i + 1]", "(arr[(i + 1)])"},
+      {"arr[0]()", "(arr[0])()"},
     ]
 
     Enum.each(tests, fn {input, expected} ->
@@ -285,6 +287,21 @@ defmodule ParserTest do
     test_literal_expression(arg1, 1)
     test_infix_expression(arg2, 2, "*", 3)
     test_infix_expression(arg3, 4, "+", 5)
+  end
+
+  test "parse access expression" do
+    input = "arr[1];"
+ 
+    program = input |> Lexer.tokenize() |> Parser.parse_program()
+    assert program.errors === []
+
+    [stmt] = program.statements
+    assert stmt.type === :expression_stmt
+
+    access = stmt.expression
+    assert access.type === :access_expression
+
+    test_literal_expression(access.index, 1)
   end
 
   test "parse strings literals" do
